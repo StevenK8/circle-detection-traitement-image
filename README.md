@@ -1,5 +1,5 @@
 # traitement-image-tp2
-1. La transform´ee de Hough pour les cercles
+1. La transformée de Hough pour les cercles
 
 2. Implementation du d´etecteur
 
