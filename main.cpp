@@ -17,7 +17,7 @@ struct accumulator
 
 struct CircleStruct
 {
-	int x, y, r;
+	int x, y, r, v;
 };
 
 double deg2rad(double degrees)
@@ -27,9 +27,6 @@ double deg2rad(double degrees)
 
 auto HoughTransform(unsigned char *img_data, int w, int h, accumulator accu)
 {
-	double center_x = w / 2;
-	double center_y = h / 2;
-
 	for (int y = 0; y < h; y++)
 	{
 		for (int x = 0; x < w; x++)
@@ -40,7 +37,6 @@ auto HoughTransform(unsigned char *img_data, int w, int h, accumulator accu)
 				{
 					for (int t = 0; t < 360; t++)
 					{
-						// double r = sqrt(pow(center_x - x, 2) + pow(center_y - y, 2));
 						int b = y - r * sin(deg2rad(t));
 						int a = x - r * cos(deg2rad(t));
 						if (a < w && b < h && a >= 0 && b >= 0)
@@ -59,11 +55,11 @@ auto HoughTransform(unsigned char *img_data, int w, int h, accumulator accu)
 vector<CircleStruct> AccumulatorThreshold(accumulator accu, double threshold)
 {
 	vector<CircleStruct> circles;
-	for (int x = 2; x < accu.accu.size() - 3; x++)
+	for (int x = 2; x < accu.accu.size() - 3; x+=4)
 	{
-		for (int y = 2; y < accu.accu[x].size() - 3; y++)
+		for (int y = 2; y < accu.accu[x].size() - 3; y+=4)
 		{
-			for (int r = 2; r < accu.accu[x][y].size() - 3; r++)
+			for (int r = 5; r < accu.accu[x][y].size() - 3; r+=4)
 			{
 				int max = 0;
 				CircleStruct circleMax = {0, 0, 0};
@@ -73,18 +69,18 @@ vector<CircleStruct> AccumulatorThreshold(accumulator accu, double threshold)
 					{
 						for (int rnear = r - 2; rnear < r + 2; rnear++)
 						{
-							if (accu.accu[x][y][r] > max)
+							if (accu.accu[xnear][ynear][rnear] > max)
 							{
-								max = accu.accu[x][y][r];
-								circleMax = {x, y, r};
+								max = accu.accu[xnear][ynear][rnear];
+								circleMax = {xnear, ynear, rnear, max};
 							}
 						}
 					}
 				}
 				if (accu.accu[circleMax.x][circleMax.y][circleMax.r] > threshold)
 				{
-					cout << accu.accu[x][y][r] << "\n";
-					circles.push_back({x, y, r});
+					cout << accu.accu[circleMax.x][circleMax.y][circleMax.r] << "\n";
+					circles.push_back({circleMax.x, circleMax.y, circleMax.r});
 				}
 			}
 		}
