@@ -36,14 +36,17 @@ auto HoughTransform(unsigned char *img_data, int w, int h, accumulator accu)
 		{
 			if (img_data[(y * w) + x] > 250)
 			{
-				for (int t = 0; t < 360; t++)
+				for (int r = 0; r < sqrt(pow(w, 2) + pow(h, 2)); r++)
 				{
-					double r = sqrt(pow(center_x - x, 2) + pow(center_y - y, 2));
-					int b = y - r * sin(deg2rad(t));
-					int a = x - r * cos(deg2rad(t));
-					if (a < x && b < y && a >= 0 && b >= 0)
+					for (int t = 0; t < 360; t++)
 					{
-						accu.accu[a][b][r]++;
+						// double r = sqrt(pow(center_x - x, 2) + pow(center_y - y, 2));
+						int b = y - r * sin(deg2rad(t));
+						int a = x - r * cos(deg2rad(t));
+						if (a < w && b < h && a >= 0 && b >= 0)
+						{
+							accu.accu[a][b][r]++;
+						}
 					}
 				}
 			}
@@ -53,20 +56,34 @@ auto HoughTransform(unsigned char *img_data, int w, int h, accumulator accu)
 	return accu;
 }
 
-vector<CircleStruct> AccumulatorThreshold(accumulator accu, accumulator accu2, double threshold)
+vector<CircleStruct> AccumulatorThreshold(accumulator accu, double threshold)
 {
 	vector<CircleStruct> circles;
-	for (int x = 0; x < accu.accu.size() - 1; x++)
+	for (int x = 2; x < accu.accu.size() - 3; x++)
 	{
-		for (int y = 0; y < accu.accu[x].size() - 1; y++)
+		for (int y = 2; y < accu.accu[x].size() - 3; y++)
 		{
-			for (int r = 0; r < accu.accu[x][y].size() - 1; r++)
+			for (int r = 2; r < accu.accu[x][y].size() - 3; r++)
 			{
-				if (accu.accu[x][y][r] > threshold)
+				int max = 0;
+				CircleStruct circleMax = {0, 0, 0};
+				for (int xnear = x - 2; xnear < x + 2; xnear++)
+				{
+					for (int ynear = y - 2; ynear < y + 2; ynear++)
+					{
+						for (int rnear = r - 2; rnear < r + 2; rnear++)
+						{
+							if (accu.accu[x][y][r] > max)
+							{
+								max = accu.accu[x][y][r];
+								circleMax = {x, y, r};
+							}
+						}
+					}
+				}
+				if (accu.accu[circleMax.x][circleMax.y][circleMax.r] > threshold)
 				{
 					cout << accu.accu[x][y][r] << "\n";
-					accu2.accu[x][y][r] = accu.accu[x][y][r];
-
 					circles.push_back({x, y, r});
 				}
 			}
@@ -105,7 +122,7 @@ int main(int argc, char **argv)
 
 	threshold(grad, grad, 25, 255, THRESH_BINARY);
 
-	int r = (int)(sqrt(pow(grad.cols / 2, 2) + pow(grad.rows, 2)));
+	int r = (int)(sqrt(pow(grad.cols, 2) + pow(grad.rows, 2)));
 	accumulator accu, accu2;
 	accu.accu = vector<vector<vector<double>>>(grad.cols, vector<vector<double>>(grad.rows, vector<double>(r)));
 	accu = HoughTransform(grad.data, grad.cols, grad.rows, accu);
@@ -121,14 +138,14 @@ int main(int argc, char **argv)
 	// Find the [a,b,r] value(s), where H[a,b,r] is above a suitable threshold value
 	//https://theailearner.com/tag/hough-transform-opencv/
 
-	accu2.accu = vector<vector<vector<double>>>(grad.cols, vector<vector<double>>(grad.rows, vector<double>(r)));
-	vector<CircleStruct> circles = AccumulatorThreshold(accu, accu2, 30);
+	// accu2.accu = vector<vector<vector<double>>>(grad.cols, vector<vector<double>>(grad.rows, vector<double>(r)));
+	vector<CircleStruct> circles = AccumulatorThreshold(accu, 350);
 
 	for (size_t i = 0; i < circles.size(); i++)
 	{
 		Point center(cvRound(circles[i].x), cvRound(circles[i].y));
 		int radius = cvRound(circles[i].r);
-		circle(img, center, radius, Scalar(0, 0, 255), 2, 8, 0);
+		circle(img, center, radius, Scalar(0, 0, 255), 1, 8, 0);
 	}
 
 	resize(img, img, Size(img.cols * 8, img.rows * 8), INTER_LINEAR);
