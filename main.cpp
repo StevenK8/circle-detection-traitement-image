@@ -6,6 +6,11 @@
 #include <fstream>
 #include <vector>
 #include <cmath>
+#include <stdlib.h>
+#include <errno.h>
+#include <limits.h>
+#include <algorithm>
+#include <cstring>
 
 using namespace std;
 using namespace cv;
@@ -19,6 +24,11 @@ struct CircleStruct
 {
 	int x, y, r, v;
 };
+
+bool compareByValue(const CircleStruct &a, const CircleStruct &b)
+{
+	return a.v > b.v;
+}
 
 double deg2rad(double degrees)
 {
@@ -98,8 +108,33 @@ int main(int argc, char **argv)
 	int ksize = 1;
 	int scale = 1;
 	int delta = 0;
+	string input_path;
+	int number_of_circles;
 
-	string image_path = samples::findFile("images/four.png");
+	char *p;
+
+	if (argc < 2)
+	{
+		cout << "usage: " << argv[0] << " <input> <number_of_circles>" << std::endl;
+		input_path = "images/four.png";
+		number_of_circles = 10;
+	}
+	else
+	{
+		input_path = argv[1];
+		// number_of_circles = std::stoi(argv[1]);
+		errno = 0;
+		long arg = strtol(argv[2], &p, 10);
+		if (*p == '\0' && errno == 0)
+		{
+			if (arg > INT_MIN && arg < INT_MAX)
+			{
+				number_of_circles = arg;
+			}
+		}
+	}
+
+	string image_path = samples::findFile(input_path);
 	Mat img = imread(image_path, IMREAD_COLOR);
 	if (img.empty())
 	{
@@ -141,9 +176,10 @@ int main(int argc, char **argv)
 
 	// accu2.accu = vector<vector<vector<double>>>(grad.cols, vector<vector<double>>(grad.rows, vector<double>(r)));
 	vector<CircleStruct> circles = AccumulatorThreshold(accu, 250);
-
-	for (size_t i = 0; i < circles.size(); i++)
+	sort(circles.begin(), circles.end(), compareByValue);
+	for (size_t i = 0; i < min((int)(circles.size()), number_of_circles); i++)
 	{
+		cout << circles[i].v << "\n";
 		Point center(cvRound(circles[i].x), cvRound(circles[i].y));
 		int radius = cvRound(circles[i].r);
 		circle(img, center, radius, Scalar(0, 0, 255), 1, 8, 0);
