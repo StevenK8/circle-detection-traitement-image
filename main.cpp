@@ -27,8 +27,10 @@ double deg2rad(double degrees)
 
 auto HoughTransform(unsigned char *img_data, int w, int h, accumulator accu)
 {
+	cout << "\rRecherche de cercles \n";
 	for (int y = 0; y < h; y++)
 	{
+		// cout << (int)(y * 100 / (h)) << "%\n" << flush; // consomme trop de temps
 		for (int x = 0; x < w; x++)
 		{
 			if (img_data[(y * w) + x] > 25)
@@ -55,14 +57,15 @@ auto HoughTransform(unsigned char *img_data, int w, int h, accumulator accu)
 vector<CircleStruct> AccumulatorThreshold(accumulator accu, double threshold)
 {
 	vector<CircleStruct> circles;
-	for (int x = 2; x < accu.accu.size() - 2; x+=4)
+	for (int x = 2; x < accu.accu.size() - 2; x += 4)
 	{
-		for (int y = 2; y < accu.accu[x].size() - 2; y+=4)
+		for (int y = 2; y < accu.accu[x].size() - 2; y += 4)
 		{
-			for (int r = 7; r < accu.accu[x][y].size() - 2; r+=4)
+			int max = 0;
+			CircleStruct circleMax = {0, 0, 0};
+			for (int r = 7; r < accu.accu[x][y].size() - 2; r += 4)
 			{
-				int max = 0;
-				CircleStruct circleMax = {0, 0, 0};
+
 				for (int xnear = x - 2; xnear < x + 2; xnear++)
 				{
 					for (int ynear = y - 2; ynear < y + 2; ynear++)
@@ -77,11 +80,11 @@ vector<CircleStruct> AccumulatorThreshold(accumulator accu, double threshold)
 						}
 					}
 				}
-				if (accu.accu[circleMax.x][circleMax.y][circleMax.r] > threshold)
-				{
-					cout << accu.accu[circleMax.x][circleMax.y][circleMax.r] << "\n";
-					circles.push_back({circleMax.x, circleMax.y, circleMax.r, circleMax.v});
-				}
+			}
+			if (accu.accu[circleMax.x][circleMax.y][circleMax.r] > threshold)
+			{
+				// cout << circleMax.v << "\n";
+				circles.push_back({circleMax.x, circleMax.y, circleMax.r, circleMax.v});
 			}
 		}
 	}
@@ -121,6 +124,8 @@ int main(int argc, char **argv)
 	int r = (int)(sqrt(pow(grad.cols, 2) + pow(grad.rows, 2)));
 	accumulator accu, accu2;
 	accu.accu = vector<vector<vector<double>>>(grad.cols, vector<vector<double>>(grad.rows, vector<double>(r)));
+
+	auto start = chrono::high_resolution_clock::now();
 	accu = HoughTransform(grad.data, grad.cols, grad.rows, accu);
 
 	//Initialize the accumulator (H[a,b,r]) to all zeros
@@ -142,17 +147,11 @@ int main(int argc, char **argv)
 		Point center(cvRound(circles[i].x), cvRound(circles[i].y));
 		int radius = cvRound(circles[i].r);
 		circle(img, center, radius, Scalar(0, 0, 255), 1, 8, 0);
-		int colorValueG = circles[i].v*0.708;
-		if(colorValueG>255){
-			colorValueG = 255;
-		}
-		int colorValueR=0;
-		if(circles[i].v!=0){
-			colorValueR = abs(colorValueG-255);
-		}
-		
-		circle(img, center,0,Scalar(0, colorValueG, colorValueR), 1, 8, 0);
+		circle(img, center, 0, Scalar(0, 255, 0), 1, 8, 0);
 	}
+	auto finish = std::chrono::high_resolution_clock::now();
+	chrono::duration<double> totalTime = finish - start;
+	cout << (int)(totalTime.count() * 1000) << " ms" << std::endl;
 
 	resize(img, img, Size(img.cols * 8, img.rows * 8), INTER_LINEAR);
 	imshow("Display window", img);
