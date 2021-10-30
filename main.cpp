@@ -101,13 +101,68 @@ vector<CircleStruct> AccumulatorThreshold(accumulator accu, double threshold)
 	return circles;
 }
 
-int main(int argc, char **argv)
+Mat preprocessImage(Mat img)
 {
-	Mat src, src_gray, grad;
 	int ddepth = CV_16S;
 	int ksize = 1;
 	int scale = 1;
 	int delta = 0;
+	Mat src, src_gray, grad;
+
+	GaussianBlur(img, src, Size(3, 3), 0, 0, BORDER_DEFAULT);
+	// Conversion de l'image en noir et blanc
+	cvtColor(src, src_gray, COLOR_BGR2GRAY);
+	Mat grad_x, grad_y;
+	Mat abs_grad_x, abs_grad_y;
+	Sobel(src_gray, grad_x, ddepth, 1, 0, ksize, scale, delta, BORDER_DEFAULT);
+	Sobel(src_gray, grad_y, ddepth, 0, 1, ksize, scale, delta, BORDER_DEFAULT);
+	// Reconversion en CV_8U
+	convertScaleAbs(grad_x, abs_grad_x);
+	convertScaleAbs(grad_y, abs_grad_y);
+	addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad);
+
+	return grad;
+}
+
+void showCircles(Mat img, vector<CircleStruct> circles, int number_of_circles)
+{
+	sort(circles.begin(), circles.end(), compareByValue);
+	for (size_t i = 0; i < min((int)(circles.size()), number_of_circles); i++)
+	{
+		cout << circles[i].v << "\n";
+		Point center(cvRound(circles[i].x), cvRound(circles[i].y));
+		int radius = cvRound(circles[i].r);
+		circle(img, center, radius, Scalar(0, 0, 255), 1, 8, 0);
+		circle(img, center, 0, Scalar(0, 255, 0), 1, 8, 0);
+	}
+}
+
+Mat HoughCirclesProcess(Mat img, int number_of_circles)
+{
+	Mat grad = preprocessImage(img); // Preprocessing
+
+	// threshold(grad, grad, 25, 255, THRESH_BINARY);
+
+	// Initialisation de l'accumulateur
+	int r = (int)(sqrt(pow(grad.cols, 2) + pow(grad.rows, 2)));
+	accumulator accu, accu2;
+	accu.accu = vector<vector<vector<double>>>(grad.cols, vector<vector<double>>(grad.rows, vector<double>(r)));
+
+	auto start = chrono::high_resolution_clock::now();
+
+	accu = HoughTransform(grad.data, grad.cols, grad.rows, accu);	//Détection de cercles
+	vector<CircleStruct> circles = AccumulatorThreshold(accu, 250); //Filtrage
+	showCircles(img, circles, number_of_circles);
+
+	auto finish = std::chrono::high_resolution_clock::now();
+	chrono::duration<double> totalTime = finish - start;
+	cout << "Temps total: " << (int)(totalTime.count() * 1000) << " ms" << std::endl;
+
+	return img;
+}
+
+int main(int argc, char **argv)
+{
 	string input_path;
 	int number_of_circles;
 
@@ -117,7 +172,7 @@ int main(int argc, char **argv)
 	{
 		cout << "usage: " << argv[0] << " <input> <number_of_circles>" << std::endl;
 		input_path = "images/four.png";
-		number_of_circles = 10;
+		number_of_circles = 9;
 	}
 	else
 	{
@@ -142,53 +197,16 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	GaussianBlur(img, src, Size(3, 3), 0, 0, BORDER_DEFAULT);
-	// Conversion de l'image en noir et blanc
-	cvtColor(src, src_gray, COLOR_BGR2GRAY);
-	Mat grad_x, grad_y;
-	Mat abs_grad_x, abs_grad_y;
-	Sobel(src_gray, grad_x, ddepth, 1, 0, ksize, scale, delta, BORDER_DEFAULT);
-	Sobel(src_gray, grad_y, ddepth, 0, 1, ksize, scale, delta, BORDER_DEFAULT);
-	// Reconversion en CV_8U
-	convertScaleAbs(grad_x, abs_grad_x);
-	convertScaleAbs(grad_y, abs_grad_y);
-	addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad);
-
-	// threshold(grad, grad, 25, 255, THRESH_BINARY);
-
-	int r = (int)(sqrt(pow(grad.cols, 2) + pow(grad.rows, 2)));
-	accumulator accu, accu2;
-	accu.accu = vector<vector<vector<double>>>(grad.cols, vector<vector<double>>(grad.rows, vector<double>(r)));
-
-	auto start = chrono::high_resolution_clock::now();
-	accu = HoughTransform(grad.data, grad.cols, grad.rows, accu);
-
-	//Initialize the accumulator (H[a,b,r]) to all zeros
-	// Find the edge image using any edge detector
-	// For r= 0 to diagonal image length
-	// For each edge pixel (x,y) in the image
-	// For Θ = 0 to 360
-	// a = x – r*cosΘ
-	// b = y – r*sinΘ
-	// H[a,b,r] = H[a,b,r] +1
-	// Find the [a,b,r] value(s), where H[a,b,r] is above a suitable threshold value
-	//https://theailearner.com/tag/hough-transform-opencv/
-
-	// accu2.accu = vector<vector<vector<double>>>(grad.cols, vector<vector<double>>(grad.rows, vector<double>(r)));
-	vector<CircleStruct> circles = AccumulatorThreshold(accu, 250);
-	sort(circles.begin(), circles.end(), compareByValue);
-	for (size_t i = 0; i < min((int)(circles.size()), number_of_circles); i++)
+	if (img.cols > 150 && img.rows > 150)
 	{
-		cout << circles[i].v << "\n";
-		Point center(cvRound(circles[i].x), cvRound(circles[i].y));
-		int radius = cvRound(circles[i].r);
-		circle(img, center, radius, Scalar(0, 0, 255), 1, 8, 0);
-		circle(img, center, 0, Scalar(0, 255, 0), 1, 8, 0);
+		// optimisation dans le cas d'une image plus grande
+		auto originalImage = img;
+		resize(img, img, Size(img.cols / 2, img.rows / 2), INTER_LINEAR);
 	}
-	auto finish = std::chrono::high_resolution_clock::now();
-	chrono::duration<double> totalTime = finish - start;
-	cout << (int)(totalTime.count() * 1000) << " ms" << std::endl;
 
+	img = HoughCirclesProcess(img, number_of_circles);
+
+	// Affichage
 	resize(img, img, Size(img.cols * 8, img.rows * 8), INTER_LINEAR);
 	imshow("Display window", img);
 	// resize(grad, grad, Size(grad.cols * 8, grad.rows * 8), INTER_LINEAR);
